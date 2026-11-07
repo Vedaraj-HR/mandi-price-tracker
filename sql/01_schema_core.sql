@@ -22,8 +22,7 @@ CREATE TABLE farmer_contact (
   CONSTRAINT pk_farmer_contact PRIMARY KEY (farmer_id, contact_number),
   CONSTRAINT fk_contact_farmer FOREIGN KEY (farmer_id) REFERENCES farmer 
 (farmer_id) ON DELETE CASCADE,
-  CONSTRAINT ck_contact_number CHECK (contact_number REGEXP '^[0-9+]
-{10,15}$')
+  CONSTRAINT ck_contact_number CHECK (contact_number REGEXP '^[0-9+]{10,15}$')
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 CREATE TABLE crop (
   crop_id   INT          NOT NULL AUTO_INCREMENT,
@@ -31,8 +30,7 @@ CREATE TABLE crop (
   category  VARCHAR(20)  NOT NULL,
   CONSTRAINT pk_crop          PRIMARY KEY (crop_id),
   CONSTRAINT uq_crop_name     UNIQUE (crop_name),
-  CONSTRAINT ck_crop_category CHECK (category IN ('Perishable', 'Non
-Perishable'))
+  CONSTRAINT ck_crop_category CHECK (category IN ('Perishable', 'Non-Perishable'))
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 CREATE TABLE mandi (
   mandi_id   INT          NOT NULL AUTO_INCREMENT,
