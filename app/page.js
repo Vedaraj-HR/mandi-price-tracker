@@ -1,69 +1,47 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+// app/page.js : replace the default Next.js page
+import { useEffect, useState } from 'react';
+import DataTable from '@/components/DataTable';
 
-export default function Home() {
+
+export default function Dashboard() {
+  const [d, setD] = useState(null);
+  const [stock, setStock] = useState([]);
+  const [crashes, setCrashes] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/dashboard').then((r) => r.json()).then(setD);
+    fetch('/api/stock').then((r) => r.json()).then((x) => setStock(x.summary ?? []));
+    fetch('/api/analytics/crash?days=7&drop=15').then((r) => r.json()).then((x) => Array.isArray(x) && setCrashes(x));
+  }, []);
+
+
+  if (!d || !d.counts) return <p>Loading...</p>;
+  const c = d.counts;
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.js</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div>
+      <h1>Dashboard</h1>
+      <div className='stats'>
+        <div className='stat'><b>{c.farmers}</b>Farmers</div>
+        <div className='stat'><b>{c.mandis}</b>Mandis</div>
+        <div className='stat'><b>{c.sales}</b>Sales recorded</div>
+        <div className='stat'><b>Rs {Number(c.revenue).toLocaleString('en-IN')}</b>Total sales value</div>
+      </div>
+      <h2>Price crash alerts (last 7 days, drop of 15 percent or more)</h2>
+      <DataTable rows={crashes} />
+      <h2>Top mandis by sales value</h2>
+      <DataTable rows={d.topMandis} />
+      <h2>Warehouse utilisation</h2>
+      <table>
+        <tbody>
+          {stock.map((w) => (
+            <tr key={w.warehouse_id}>
+              <td>{w.location}</td>
+              <td><span className='bar'><span style={{ width: `${Math.min(w.utilization_pct, 100)}%` }} /></span> {w.utilization_pct}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
