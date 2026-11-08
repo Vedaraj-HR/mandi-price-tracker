@@ -26,8 +26,9 @@ export const POST = handler(ANY, async (req, _ctx, s) => {
         max_price: { type: 'number', required: true, gt: 0 },
         modal_price: { type: 'number', required: true, gt: 0 },
     });
-    if (!(d.min_price <= d.modal_price && d.modal_price <= d.max_price)) throw
-        new HttpError(400, 'Prices must satisfy min <= modal <= max');
+    if (!(d.min_price <= d.modal_price && d.modal_price <= d.max_price)) {
+        throw new HttpError(400, 'Prices must satisfy min <= modal <= max');
+    }
     const [r] = await getPool(s.role).query(
         `INSERT INTO price_record (mandi_id, crop_id, price_date, min_price,
 max_price, modal_price) VALUES (?, ?, ?, ?, ?, ?) AS new
