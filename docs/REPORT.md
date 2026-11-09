@@ -1,5 +1,64 @@
 # Mandi Price Tracking System
 
+## 1. Problem Statement
+
+Farmers sell their crops at mandis (wholesale agricultural markets). The same crop is often sold at very different prices in different mandis on the same day, and reaching a better-paying mandi costs money in transport. A farmer who looks only at the headline price can end up with less money than one who sells nearby.
+
+At present this information is scattered: prices are noted by hand, price drops are noticed late, storage in warehouses is tracked on paper, and nobody works out the best mandi by net return (price minus transport cost). This project builds a web application that stores the data in one place, analyses price trends and sudden crashes, manages warehouse stock, and recommends the mandi that gives the best net return.
+
+## 2. Objectives
+
+1. Store farmers, their contact numbers, crops, mandis, sales and daily mandi prices in a relational database (MySQL) with keys and constraints that keep the data correct.
+2. Record sales safely through a stored procedure that runs as one transaction.
+3. Show price trends with a moving average, detect sudden price crashes, and compare mandis.
+4. Track warehouses and storage batches, and refuse a batch that would exceed a warehouse's capacity (database trigger).
+5. Recommend the mandi with the best net return, using the cheapest transport route (recursive CTE and a stored function).
+6. Store the mandis and roads as a graph in Neo4j, so the cheapest route between two mandis is found by path-finding, and keep the graph consistent with MySQL.
+7. Provide secure login with two roles (Admin and Staff), enforced both in the application and by MySQL privileges (GRANT).
+
+## 3. Scope
+
+**In scope**
+- A web application (Next.js) with forms, tables, search and a dashboard.
+- Ten MySQL tables, three views, two stored procedures, one function and four triggers.
+- A Neo4j graph of mandis and roads, with create, read, update and delete from the Routes page.
+- Login with password hashing (bcrypt) and a signed session cookie (JWT).
+- Role-based access control at the API layer and at the database layer.
+
+**Out of scope**
+- Online payments, farmer self-registration and mobile apps.
+- Live price feeds from government sources (sample data is seeded instead).
+- Weather and crop-yield prediction.
+- Hosting and deployment beyond a local build.
+
+## 4. Functional Requirements
+
+**Roles**
+
+| Capability | Admin | Staff |
+|---|---|---|
+| Log in and view the dashboard | Yes | Yes |
+| Read every table (except password hashes) | Yes | Yes |
+| Record sales and prices | Yes | Yes |
+| Add, edit and delete farmers (with alternate numbers) | Yes | Yes |
+| Add, edit and delete storage batches | Yes | Yes |
+| Delete sales | Yes | No |
+| Manage crops, mandis and warehouses | Yes | No |
+| Manage users | Yes | No |
+| Add, change and delete roads (Neo4j and MySQL) | Yes | No |
+
+**Main functions**
+- **Authentication:** login with username and password, logout, and a front door that redirects anyone who is not logged in.
+- **Sales:** record a sale through the `record_sale` procedure, with validation of quantity, price and date.
+- **Prices:** save a daily price per mandi and crop (an existing row is updated), with the rule min price <= modal price <= max price.
+- **Analytics:** price trend with a moving average, price crash alerts, and comparison between mandis.
+- **Farmers:** add a farmer with several alternate contact numbers, stored in a separate table.
+- **Storage:** record batches through the `add_storage_batch` procedure; view stock per warehouse and per crop.
+- **Best mandi:** rank the reachable mandis for a crop by net return.
+- **Routes:** add, view, change and delete roads, and find the cheapest route between two mandis.
+- **Master data:** crops, mandis, warehouses and users (Admin only).
+- **Dashboard:** counts, total sales value, top mandis, price crash alerts and warehouse utilisation.
+
 ## 7. Database Choice and Justification
 
 The project uses two databases: **MySQL 8.4** and **Neo4j AuraDB**. Each database is selected for the type of data and operations it handles best.
