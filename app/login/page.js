@@ -27,6 +27,7 @@ export default function LoginPage() {
       <label>Password<input type='password' value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
       {error && <p className='err'>{error}</p>}
       <button type='submit'>Log in</button>
+      <p className='hint'>New farmer? <a href='/register'>Create an account</a></p>
     </form>
   );
 }

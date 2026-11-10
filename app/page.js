@@ -1,47 +1,45 @@
 'use client';
-// app/page.js : replace the default Next.js page
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useMe } from '@/lib/useMe';
+import { MENU, ROLE_LABEL } from '@/lib/menu';
 import DataTable from '@/components/DataTable';
 
-
-export default function Dashboard() {
-  const [d, setD] = useState(null);
-  const [stock, setStock] = useState([]);
+export default function Home() {
+  const me = useMe();
+  const [data, setData] = useState(null);
   const [crashes, setCrashes] = useState([]);
-
   useEffect(() => {
-    fetch('/api/dashboard').then((r) => r.json()).then(setD);
-    fetch('/api/stock').then((r) => r.json()).then((x) => setStock(x.summary ?? []));
-    fetch('/api/analytics/crash?days=7&drop=15').then((r) => r.json()).then((x) => Array.isArray(x) && setCrashes(x));
-  }, []);
-
-
-  if (!d || !d.counts) return <p>Loading...</p>;
-  const c = d.counts;
+    if (!me) return;
+    fetch('/api/home').then((r) => (r.ok ? r.json() : null)).then(setData);
+    if (me.role === 'Farmer') {
+      fetch('/api/analytics/crash?days=7&drop=15').then((r) => (r.ok ? r.json() : [])).then((d) => Array.isArray(d) && setCrashes(d));
+    }
+  }, [me]);
+  if (!me) return <p>Loading...</p>;
+  const i = data?.info;
   return (
     <div>
-      <h1>Dashboard</h1>
+      <h1>Welcome, {me.username} ({ROLE_LABEL[me.role]})</h1>
+      {data?.kind === 'mandi' && i && <div className='stats'>
+        <div className='stat'><b>{i.name}</b>{i.location}</div>
+        <div className='stat'><b>{i.sales_count}</b>Sales recorded</div>
+        <div className='stat'><b>Rs {Number(i.total_sales).toLocaleString('en-IN')}</b>Total sales value</div>
+        <div className='stat'><b>{i.price_records}</b>Price records</div>
+      </div>}
+      {data?.kind === 'warehouse' && i && <div className='stats'>
+        <div className='stat'><b>{i.location}</b>Warehouse</div>
+        <div className='stat'><b>{i.batch_total} / {i.capacity}</b>Quintals stored</div>
+        <div className='stat'><b>{i.utilization_pct}%</b>Utilisation</div>
+        <div className='stat'><b>{i.batches}</b>Batches</div>
+      </div>}
+      {me.role === 'Farmer' && <><h2>Price crash warnings (last 7 days)</h2><DataTable rows={crashes} /></>}
+      <h2>Your pages</h2>
       <div className='stats'>
-        <div className='stat'><b>{c.farmers}</b>Farmers</div>
-        <div className='stat'><b>{c.mandis}</b>Mandis</div>
-        <div className='stat'><b>{c.sales}</b>Sales recorded</div>
-        <div className='stat'><b>Rs {Number(c.revenue).toLocaleString('en-IN')}</b>Total sales value</div>
+        {(MENU[me.role] ?? []).filter(([href]) => href !== '/').map(([href, label]) => (
+          <Link key={href} href={href} className='stat'><b>{label}</b>Open</Link>
+        ))}
       </div>
-      <h2>Price crash alerts (last 7 days, drop of 15 percent or more)</h2>
-      <DataTable rows={crashes} />
-      <h2>Top mandis by sales value</h2>
-      <DataTable rows={d.topMandis} />
-      <h2>Warehouse utilisation</h2>
-      <table>
-        <tbody>
-          {stock.map((w) => (
-            <tr key={w.warehouse_id}>
-              <td>{w.location}</td>
-              <td><span className='bar'><span style={{ width: `${Math.min(w.utilization_pct, 100)}%` }} /></span> {w.utilization_pct}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
