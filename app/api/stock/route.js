@@ -1,10 +1,9 @@
-// app/api/stock/route.js : reads the two views
 import { getPool } from '@/lib/db';
-import { handler, ANY } from '@/lib/guard';
+import { handler, WAREHOUSE } from '@/lib/guard';
 
-export const GET = handler(ANY, async (_req, _ctx, s) => {
+export const GET = handler(WAREHOUSE, async (_req, _ctx, s) => {
   const pool = getPool(s.role);
-  const [summary] = await pool.query('SELECT * FROM warehouse_stock_summary ORDER BY utilization_pct DESC');
-  const [byCrop] = await pool.query('SELECT * FROM crop_stock_by_warehouse ORDER BY location, crop_name');
-  return Response.json({ summary, byCrop });
+  const [home] = await pool.query('CALL warehouse_home(?)', [s.uid]);
+  const [byCrop] = await pool.query('CALL warehouse_stock(?)', [s.uid]);
+  return Response.json({ summary: home[0][0] ?? null, byCrop: byCrop[0] });
 });
