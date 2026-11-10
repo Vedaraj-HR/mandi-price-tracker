@@ -1,5 +1,64 @@
 # Mandi Price Tracking System
 
+## 1. Problem Statement
+
+Farmers sell their crops at mandis (wholesale agricultural markets). The same crop is often sold at very different prices in different mandis on the same day, and reaching a better-paying mandi costs money in transport. A farmer who looks only at the headline price can end up with less money than one who sells nearby.
+
+At present this information is scattered: prices are noted by hand, price drops are noticed late, storage in warehouses is tracked on paper, and nobody works out the best mandi by net return (price minus transport cost). This project builds a web application that stores the data in one place, analyses price trends and sudden crashes, manages warehouse stock, and recommends the mandi that gives the best net return.
+
+## 2. Objectives
+
+1. Store farmers, their contact numbers, crops, mandis, sales and daily mandi prices in a relational database (MySQL) with keys and constraints that keep the data correct.
+2. Record sales safely through a stored procedure that runs as one transaction.
+3. Show price trends with a moving average, detect sudden price crashes, and compare mandis.
+4. Track warehouses and storage batches, and refuse a batch that would exceed a warehouse's capacity (database trigger).
+5. Recommend the mandi with the best net return, using the cheapest transport route (recursive CTE and a stored function).
+6. Store the mandis and roads as a graph in Neo4j, so the cheapest route between two mandis is found by path-finding, and keep the graph consistent with MySQL.
+7. Provide secure login with two roles (Admin and Staff), enforced both in the application and by MySQL privileges (GRANT).
+
+## 3. Scope
+
+**In scope**
+- A web application (Next.js) with forms, tables, search and a dashboard.
+- Ten MySQL tables, three views, two stored procedures, one function and four triggers.
+- A Neo4j graph of mandis and roads, with create, read, update and delete from the Routes page.
+- Login with password hashing (bcrypt) and a signed session cookie (JWT).
+- Role-based access control at the API layer and at the database layer.
+
+**Out of scope**
+- Online payments, farmer self-registration and mobile apps.
+- Live price feeds from government sources (sample data is seeded instead).
+- Weather and crop-yield prediction.
+- Hosting and deployment beyond a local build.
+
+## 4. Functional Requirements
+
+**Roles**
+
+| Capability | Admin | Staff |
+|---|---|---|
+| Log in and view the dashboard | Yes | Yes |
+| Read every table (except password hashes) | Yes | Yes |
+| Record sales and prices | Yes | Yes |
+| Add, edit and delete farmers (with alternate numbers) | Yes | Yes |
+| Add, edit and delete storage batches | Yes | Yes |
+| Delete sales | Yes | No |
+| Manage crops, mandis and warehouses | Yes | No |
+| Manage users | Yes | No |
+| Add, change and delete roads (Neo4j and MySQL) | Yes | No |
+
+**Main functions**
+- **Authentication:** login with username and password, logout, and a front door that redirects anyone who is not logged in.
+- **Sales:** record a sale through the `record_sale` procedure, with validation of quantity, price and date.
+- **Prices:** save a daily price per mandi and crop (an existing row is updated), with the rule min price <= modal price <= max price.
+- **Analytics:** price trend with a moving average, price crash alerts, and comparison between mandis.
+- **Farmers:** add a farmer with several alternate contact numbers, stored in a separate table.
+- **Storage:** record batches through the `add_storage_batch` procedure; view stock per warehouse and per crop.
+- **Best mandi:** rank the reachable mandis for a crop by net return.
+- **Routes:** add, view, change and delete roads, and find the cheapest route between two mandis.
+- **Master data:** crops, mandis, warehouses and users (Admin only).
+- **Dashboard:** counts, total sales value, top mandis, price crash alerts and warehouse utilisation.
+
 ## 7. Database Choice and Justification
 
 The project uses two databases: **MySQL 8.4** and **Neo4j AuraDB**. Each database is selected for the type of data and operations it handles best.
@@ -89,6 +148,49 @@ Stores daily minimum, maximum, and modal prices of crops at different mandis.
 
 The primary key of `price_record` consists of `mandi_id`, `crop_id`, and `price_date`. The constraints ensure that prices are positive and that the minimum price does not exceed the modal price, which does not exceed the maximum price.
 
+### 8.8 Warehouse
+
+Stores the warehouses in which crops are kept. These three tables (warehouse, storage_batch and transports) were designed and implemented by Sunil in `sql/02_schema_storage_routes.sql`.
+
+| Attribute | Data type | Constraint | Description |
+|---|---|---|---|
+| warehouse_id | INT | Primary Key, Auto Increment | Unique warehouse identifier |
+| location | VARCHAR(150) | NOT NULL | Place where the warehouse is located |
+| capacity | DECIMAL(12,2) | NOT NULL, CHECK (capacity > 0) | Maximum quantity the warehouse can hold (quintals) |
+
+### 8.9 Storage Batch
+
+Stores each batch of a crop kept in a warehouse. A batch cannot exist without its warehouse, so its key combines the warehouse and a batch number that is counted separately inside each warehouse.
+
+| Attribute | Data type | Constraint | Description |
+|---|---|---|---|
+| warehouse_id | INT | Composite Primary Key, Foreign Key | References warehouse(warehouse_id), ON DELETE CASCADE |
+| batch_no | INT | Composite Primary Key | Batch number inside the warehouse, generated by the `add_storage_batch` procedure |
+| crop_id | INT | NOT NULL, Foreign Key | References crop(crop_id), ON DELETE RESTRICT |
+| quantity | DECIMAL(12,2) | NOT NULL, CHECK (quantity > 0) | Quantity stored in this batch (quintals) |
+| date_in | DATE | NOT NULL, Default: CURRENT_DATE | Date the batch entered the warehouse |
+
+The primary key consists of `warehouse_id` and `batch_no`. Deleting a warehouse deletes its batches (ON DELETE CASCADE), while a crop that is still stored cannot be deleted (ON DELETE RESTRICT). The triggers `trg_batch_capacity_ins` and `trg_batch_capacity_upd` refuse any insert or update that would make the total stored quantity exceed the warehouse capacity. The indexes `idx_batch_date_in` and `idx_batch_crop` speed up searches by date and by crop.
+
+### 8.10 Transports
+
+Stores the roads between mandis with their distance and transport cost. Every road is stored in both directions, so a route can be followed either way. The same data is copied to Neo4j as the route graph.
+
+| Attribute | Data type | Constraint | Description |
+|---|---|---|---|
+| source_mandi_id | INT | Composite Primary Key, Foreign Key | References mandi(mandi_id), ON DELETE CASCADE |
+| destination_mandi_id | INT | Composite Primary Key, Foreign Key | References mandi(mandi_id), ON DELETE CASCADE |
+| distance | DECIMAL(8,2) | NOT NULL, CHECK (distance > 0) | Road distance between the two mandis (km) |
+| cost | DECIMAL(10,2) | NOT NULL, CHECK (cost >= 0) | Transport cost per quintal (Rs) |
+
+The primary key of `transports` consists of `source_mandi_id` and `destination_mandi_id`, so the same road cannot be stored twice. A CHECK constraint (`source_mandi_id <> destination_mandi_id`) prevents a road from a mandi to itself. The index `idx_transports_dest` speeds up route searches that start from a destination.
+
+### 8.11 Views on Storage Data
+
+| View | Purpose |
+|---|---|
+| warehouse_stock_summary | For each warehouse: capacity, total stored quantity and utilisation percentage |
+| crop_stock_by_warehouse | For each warehouse and crop: the total quantity stored |
 
 ## 9. SQL and NoSQL Implementation
 
@@ -274,9 +376,87 @@ The queries are maintained in `sql/queries_sales_prices.sql`.
 
 ## 10.2 Storage and Route Queries
 
-This subsection will be completed by Sunil using `sql/queries_storage_routes.sql`. It will cover recursive CTE-based cheapest-route calculation, JOIN operations on transport routes, warehouse stock views, correlated and nested subqueries, index verification using EXPLAIN and transaction demonstration.
+The storage and route queries are maintained in `sql/queries_storage_routes.sql`. They use the warehouse, storage_batch, transports, mandi and crop tables and the two storage views. They cover a recursive CTE, joins, a view with a filter, correlated and nested subqueries, index verification with EXPLAIN, and a transaction demonstration. The expected results below follow from the seeded sample data (4 warehouses, 10 batches and 16 directed roads).
 
-**Result screenshots:** To be added along with the corresponding query explanations.
+### Query 9: Recursive CTE for the Cheapest Route
+
+**Purpose:** Finds the cheapest route between two mandis (set with `@src` and `@dst`). The CTE starts from every road leaving the source mandi and keeps extending each path by one road, adding up the cost and distance. A path is not allowed to visit a mandi twice and is limited to six roads.
+
+**DBMS concept:** Recursive Common Table Expression (WITH RECURSIVE) with cycle prevention.
+
+**Expected result:** From Yeshwanthpur APMC (id 1) to Davangere APMC (id 5), the cheapest path goes through Tumakuru APMC (path 1>3>5, 2 roads, 245 km, cost Rs 368). This is cheaper than the direct road (260 km, cost Rs 390).
+
+**Result screenshot:** Insert the MySQL Workbench output here.
+
+### Query 10: JOIN of Transport Routes with Mandi Names
+
+**Purpose:** Lists every road with the names of its source and destination mandi, the distance and the transport cost.
+
+**DBMS concept:** Joining the same table (mandi) twice, once for each end of the road.
+
+**Expected result:** 16 rows, one for each directed road.
+
+**Result screenshot:** Insert the MySQL Workbench output here.
+
+### Query 11: View with a Filter on Warehouse Utilisation
+
+**Purpose:** Lists the warehouses that are more than 30 percent full, using the view `warehouse_stock_summary`.
+
+**DBMS concept:** Query on a view that contains a LEFT JOIN, GROUP BY and aggregate functions.
+
+**Expected result:** With the seeded batches all four warehouses are above 30 percent (Bengaluru Cold Store 72.0, Hubballi Warehouse 68.8, Mysuru Godown 60.0, Kolar Godown 46.7).
+
+**Result screenshot:** Insert the MySQL Workbench output here.
+
+### Query 12: Correlated Subquery on Batch Size
+
+**Purpose:** Finds the batches that are larger than the average batch of their own warehouse.
+
+**DBMS concept:** Correlated subquery. The inner query depends on the warehouse of the current outer row.
+
+**Expected result:** One batch from each warehouse (for example the 1,500 quintal potato batch in Bengaluru Cold Store).
+
+**Result screenshot:** Insert the MySQL Workbench output here.
+
+### Query 13: Nested Subquery with GROUP BY and HAVING
+
+**Purpose:** Lists the crops that are stored in more than one warehouse.
+
+**DBMS concept:** Nested subquery using IN, with GROUP BY, HAVING and COUNT(DISTINCT).
+
+**Expected result:** Tomato, Onion and Potato.
+
+**Result screenshot:** Insert the MySQL Workbench output here.
+
+### Query 14: Stock of Each Crop in Each Warehouse
+
+**Purpose:** Shows how much of each crop is stored in each warehouse, using the view `crop_stock_by_warehouse`.
+
+**DBMS concept:** View built from a three-table join with aggregation.
+
+**Expected result:** One row for each crop and warehouse combination that holds stock, sorted from the largest quantity.
+
+**Result screenshot:** Insert the MySQL Workbench output here.
+
+### Query 15: Index Verification with EXPLAIN
+
+**Purpose:** Checks that a search on sales by mandi, crop and date uses the composite index.
+
+**DBMS concept:** Query optimisation and the composite index `idx_sale_mandi_crop_date` on `sale(mandi_id, crop_id, sale_date)`.
+
+**Expected result:** The `key` column of the EXPLAIN output shows `idx_sale_mandi_crop_date`.
+
+**Result screenshot:** Insert the MySQL Workbench output here.
+
+### Query 16: Transaction Demonstration
+
+**Purpose:** Raises the cost of one road inside a transaction, shows the changed value, then undoes the change with ROLLBACK and shows the original value again.
+
+**DBMS concept:** Transaction control (START TRANSACTION, ROLLBACK) and atomicity.
+
+**Expected result:** The first SELECT shows the cost increased by 100. After ROLLBACK the second SELECT shows the original cost.
+
+**Result screenshot:** Insert the MySQL Workbench output here.
 
 ## 10.3 Summary
 
