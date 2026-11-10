@@ -23,6 +23,8 @@ export default function ResourcePage(props) {
     if (r.ok) setRows(d); else setMsg({ ok: false, text: d.error });
   }, [endpoint, q]);
 
+  // Synchronize the table with the server whenever the query changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     fields.filter((f) => f.optionsUrl).forEach(async (f) => {
