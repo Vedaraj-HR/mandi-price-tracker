@@ -9,7 +9,18 @@
     "lint": "eslint",
     "db:roles": "node --env-file=.env.local scripts/setup-roles.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed-core.mjs && node --env-file=.env.local scripts/seed-storage-routes.mjs",
-    "graph:sync": "node --env-file=.env.local scripts/sync-neo4j.mjs"
+    "graph:sync": "node --env-file=.env.local scripts/sync-neo4j.mjs",
+    "route:probe": "node --env-file=.env.local scripts/probe-routing.mjs",
+    "db:coords": "node --env-file=.env.local scripts/set-mandi-coordinates.mjs",
+    "data:probe": "node --env-file=.env.local scripts/probe-agmarknet.mjs",
+    "data:import": "node --env-file=.env.local scripts/import-agmarknet.mjs",
+    "data:sales": "node --env-file=.env.local scripts/seed-sales-real.mjs",
+    "data:backfill": "node --env-file=.env.local scripts/backfill-sample.mjs",
+    "data:roads": "node --env-file=.env.local scripts/build-roads-map.mjs",
+    "data:storage": "node --env-file=.env.local scripts/seed-storage-real.mjs",
+    "db:shelf": "node --env-file=.env.local scripts/seed-shelf-life.mjs",
+    "db:demo": "node --env-file=.env.local scripts/seed-roles-demo.mjs"
+
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
