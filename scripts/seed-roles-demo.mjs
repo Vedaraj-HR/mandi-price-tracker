@@ -75,7 +75,7 @@ try {
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 3);
     await db.query('DELETE FROM farmer_near_mandi WHERE farmer_id = ?', [farmer.farmer_id]);
-    await db.query('INSERT INTO farmer_near_mandi (farmer_id, mandi_id, distance_km) VALUES ?', [
+    await db.query('INSERT INTO farmer_near_mandi (farmer_id, mandi_id, distance) VALUES ?', [
       nearest.map(({ mandi, distance }) => [farmer.farmer_id, mandi.mandi_id, Math.round(distance * 100) / 100]),
     ]);
   }
