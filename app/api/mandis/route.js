@@ -1,8 +1,7 @@
-// app/api/mandis/route.js
-import { collection } from '@/lib/crud';
-import { mandiCfg } from '@/lib/resources';
+import { getPool } from '@/lib/db';
+import { handler, FARMER } from '@/lib/guard';
 
-
-const c = collection(mandiCfg);
-export const GET = c.GET;
-export const POST = c.POST;
+export const GET = handler(FARMER, async (_req, _ctx, s) => {
+    const [rows] = await getPool(s.role).query('SELECT mandi_id, name, location FROM mandi ORDER BY name');
+    return Response.json(rows);
+});
