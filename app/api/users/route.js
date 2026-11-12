@@ -1,10 +1,10 @@
 // app/api/users/route.js
 import bcrypt from 'bcryptjs';
 import { getPool } from '@/lib/db';
-import { handler, ADMIN } from '@/lib/guard';
+import { handler, MANDI_ADMIN } from '@/lib/guard';
 import { validate } from '@/lib/validate';
 
-export const GET = handler(ADMIN, async (req, _ctx, s) => {
+export const GET = handler(MANDI_ADMIN, async (req, _ctx, s) => {
   const q = `%${new URL(req.url).searchParams.get('q')?.trim() ?? ''}%`;
   const [rows] = await getPool(s.role).query('SELECT user_id, username, role FROM users WHERE username LIKE ? ORDER BY username', [q]);
   return Response.json(rows);

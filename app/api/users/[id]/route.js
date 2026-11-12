@@ -1,12 +1,12 @@
 // app/api/users/[id]/route.js
 import bcrypt from 'bcryptjs';
 import { getPool } from '@/lib/db';
-import { handler, ADMIN } from '@/lib/guard';
+import { handler, MANDI_ADMIN } from '@/lib/guard';
 import { validate } from '@/lib/validate';
 import { HttpError } from '@/lib/errors';
 
 
-export const PUT = handler(ADMIN, async (req, { params }, s) => {
+export const PUT = handler(MANDI_ADMIN, async (req, { params }, s) => {
   const { id } = await params;
   const d = validate(await req.json(), {
     role: { type: 'enum', required: true, values: ['Admin', 'Staff'] },

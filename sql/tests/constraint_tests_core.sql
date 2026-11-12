@@ -28,17 +28,22 @@ INSERT INTO sale (farmer_id, mandi_id, crop_id, quantity, price) VALUES (1, 1, 1
 INSERT INTO sale (farmer_id, mandi_id, crop_id, quantity, price) VALUES (9999, 1, 1, 5, 100);
 -- FOREIGN KEY
 
-INSERT INTO price_record VALUES (1, 1, '2030-01-01', 200, 100, 150);
+INSERT INTO price_record
+(mandi_id, crop_id, price_date, min_price, max_price, modal_price)
+VALUES (1, 1, '2030-01-01', 200, 100, 150);
 -- CHECK min <= modal <= max
 
 DELETE FROM farmer WHERE farmer_id = (SELECT farmer_id FROM sale LIMIT 1);
 -- RESTRICT
 
-DELETE FROM users WHERE username = 'admin';
--- RESTRICT (manages mandis)
+DELETE FROM users WHERE user_id = (SELECT managed_by FROM mandi LIMIT 1);
+-- RESTRICT (manages a mandi)
 
-CALL record_sale(1, 1, 1, -5, 100, NULL);
--- procedure validation
+CALL record_sale(25, 1, 1, -5, 100, NULL);
+-- procedure validation: quantity
 
-CALL record_sale(1, 1, 1, 5, 100, '2099-01-01');
+CALL record_sale(25, 1, 1, 5, 100, '2099-01-01');
 -- future date refused
+
+CALL record_sale(37, 1, 1, 5, 100, NULL);
+-- a warehouse user cannot sell: not linked to a mandi
