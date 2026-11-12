@@ -6,7 +6,7 @@ SELECT * FROM storage_batch;                                -- ERROR 1142
 UPDATE crop SET category = 'Perishable' WHERE crop_id = 1; -- ERROR 1142
 CALL mandi_db.add_storage_batch(1, NULL, 1, 10, NULL);      -- ERROR 1370
 CALL mandi_db.delete_sale(1, 1);                            -- ERROR 1370
-CALL mandi_db.record_sale(99999, 1, 1, 10, 100, NULL);      -- ERROR 1644
+CALL mandi_db.record_sale(37, 1, 1, 10, 100, NULL);      -- ERROR 1644
 -- Connected as mandi_wstaff
 SELECT * FROM price_record;                                 -- ERROR 1142
 CALL mandi_db.record_sale(1, 1, 1, 10, 100, NULL);          -- ERROR 1370
