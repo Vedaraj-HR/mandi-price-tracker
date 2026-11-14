@@ -549,12 +549,16 @@ The current local verification pass confirmed the public login/register flow and
 
 Additional captured evidence files:
 
+| `25_five_role_menus.png` | Composite of Mandi Admin, Mandi Staff, Warehouse Admin, Warehouse Staff and Farmer menus | Sunil |
+
 | `01_login.png` | Login screen | Sunil |
 | `02_farmer_register.png` | Farmer self-registration screen | Vedaraj |
 | `02_warehouse_admin_dashboard.png` | Warehouse Admin scoped dashboard | Sunil |
 | `27_staff_page.png` | Staff management page | Sunil |
 | `28_warehouse_batches.png` | Warehouse batches page | Sunil |
 | `29_shelf_life.png` | Crop shelf-life page | Sunil |
+| `26_rbac_v2_errors.png` | Farmer viewing the Admin-only Users page | Sunil |
+| `30_stored_spoilage.png` | Farmer stored produce and spoilage forecast | Sunil |
 
 | Screenshot | Description | Responsibility |
 |---|---|---|
