@@ -547,6 +547,15 @@ All screenshots are stored in the `docs/screenshots/` directory.
 
 The current local verification pass confirmed the public login/register flow and the scoped dashboards for Mandi Admin and Warehouse Admin. The browser evidence captured in this pass covered the dashboard, staff, batches and shelf-life routes; empty tables reflect the current demo seed rather than a page failure.
 
+Additional captured evidence files:
+
+| `01_login.png` | Login screen | Sunil |
+| `02_farmer_register.png` | Farmer self-registration screen | Vedaraj |
+| `02_warehouse_admin_dashboard.png` | Warehouse Admin scoped dashboard | Sunil |
+| `27_staff_page.png` | Staff management page | Sunil |
+| `28_warehouse_batches.png` | Warehouse batches page | Sunil |
+| `29_shelf_life.png` | Crop shelf-life page | Sunil |
+
 | Screenshot | Description | Responsibility |
 |---|---|---|
 | `01_login.png` | Application login page | Sunil |
