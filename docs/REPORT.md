@@ -14,7 +14,7 @@ At present this information is scattered: prices are noted by hand, price drops 
 4. Track warehouses and storage batches, and refuse a batch that would exceed a warehouse's capacity (database trigger).
 5. Recommend the mandi with the best net return, using the cheapest transport route (recursive CTE and a stored function).
 6. Store the mandis and roads as a graph in Neo4j, so the cheapest route between two mandis is found by path-finding, and keep the graph consistent with MySQL.
-7. Provide secure login with two roles (Admin and Staff), enforced both in the application and by MySQL privileges (GRANT).
+7. Provide secure login with scoped mandi, warehouse, farmer and super-admin roles, enforced both in the application and by MySQL privileges (GRANT).
 
 ## 3. Scope
 
@@ -26,7 +26,7 @@ At present this information is scattered: prices are noted by hand, price drops 
 - Role-based access control at the API layer and at the database layer.
 
 **Out of scope**
-- Online payments, farmer self-registration and mobile apps.
+- Online payments, live government price feeds and mobile apps.
 - Live price feeds from government sources (sample data is seeded instead).
 - Weather and crop-yield prediction.
 - Hosting and deployment beyond a local build.
@@ -35,17 +35,15 @@ At present this information is scattered: prices are noted by hand, price drops 
 
 **Roles**
 
-| Capability | Admin | Staff |
+| Capability | Mandi Admin | Mandi Staff | Warehouse Admin | Warehouse Staff | Farmer |
 |---|---|---|
-| Log in and view the dashboard | Yes | Yes |
-| Read every table (except password hashes) | Yes | Yes |
-| Record sales and prices | Yes | Yes |
-| Add, edit and delete farmers (with alternate numbers) | Yes | Yes |
-| Add, edit and delete storage batches | Yes | Yes |
-| Delete sales | Yes | No |
-| Manage crops, mandis and warehouses | Yes | No |
-| Manage users | Yes | No |
-| Add, change and delete roads (Neo4j and MySQL) | Yes | No |
+| Log in and view a scoped dashboard | Yes | Yes | Yes | Yes | Yes |
+| Read mandi data | Yes | Yes | No | No | Scoped |
+| Manage prices and sales | Yes | Yes | No | No | Own sales |
+| Manage warehouse batches and stock | No | No | Yes | Yes | Own batches |
+| Manage staff of own organisation | Yes | No | Yes | No | No |
+| Manage crops, mandis and warehouses | Yes | No | No | No | No |
+| Manage roads and route data | Yes | No | No | No | No |
 
 **Main functions**
 - **Authentication:** login with username and password, logout, and a front door that redirects anyone who is not logged in.
@@ -547,6 +545,17 @@ All screenshots are stored in the `docs/screenshots/` directory.
 
 ## 12.1 Screenshot List
 
+The current local verification pass confirmed the public login/register flow and the scoped dashboards for Mandi Admin and Warehouse Admin. The browser evidence captured in this pass covered the dashboard, staff, batches and shelf-life routes; empty tables reflect the current demo seed rather than a page failure.
+
+Additional captured evidence files:
+
+| `01_login.png` | Login screen | Sunil |
+| `02_farmer_register.png` | Farmer self-registration screen | Vedaraj |
+| `02_warehouse_admin_dashboard.png` | Warehouse Admin scoped dashboard | Sunil |
+| `27_staff_page.png` | Staff management page | Sunil |
+| `28_warehouse_batches.png` | Warehouse batches page | Sunil |
+| `29_shelf_life.png` | Crop shelf-life page | Sunil |
+
 | Screenshot | Description | Responsibility |
 |---|---|---|
 | `01_login.png` | Application login page | Sunil |
@@ -583,7 +592,7 @@ The test cases are based on the project implementation guide. Both team members 
 
 | ID | Feature | Expected Result | Result |
 |---|---|---|---|
-| T01 | Login with correct password (S) | Dashboard opens and Users link is visible for admin | To be verified |
+| T01 | Login with correct password (S) | Scoped dashboard opens for the selected role | Verified locally (Mandi Admin and Warehouse Admin) |
 | T02 | Login with incorrect password (S) | Invalid username or password message | To be verified |
 | T03 | Front-door authentication (S) | Logged-out user accessing `/sales` is redirected to login | To be verified |
 | T04 | Web RBAC (S) | Staff accessing `/api/users` receives 403 | To be verified |
@@ -599,15 +608,15 @@ The test cases are based on the project implementation guide. Both team members 
 | T14 | Crash detection (V) | Tomato price crash of approximately 32% at Kolar APMC is identified | Query result verified |
 | T15 | Farmer contacts (S) | Alternate contacts can be added and edited | To be verified |
 | T16 | Farmer deletion (S) | Farmer with dependent sales cannot be deleted | To be verified |
-| T17 | Warehouse capacity trigger (S) | Storage exceeding available capacity is rejected | To be verified |
-| T18 | Stock views (S) | Stock utilisation matches stored batch quantities | To be verified |
+| T17 | Warehouse capacity trigger (S) | Storage exceeding available capacity is rejected | Database routine installed; UI evidence pending |
+| T18 | Stock views (S) | Stock utilisation matches stored batch quantities | UI route verified locally; seeded table empty |
 | T19 | Best mandi recommendation (S) | Mandis are ranked by net return and the best option is highlighted | To be verified |
 | T20 | Neo4j create (V) | Adding a road updates MySQL and Neo4j | Graph sync verified; UI CRUD to be verified |
 | T21 | Neo4j read (V) | Cheapest route results from Neo4j and MySQL agree | To be verified |
 | T22 | Neo4j update (V) | Updating road cost changes the calculated route when appropriate | To be verified |
 | T23 | Neo4j delete (V) | Deleted road is removed from MySQL and Neo4j | To be verified |
 | T24 | Two-database transaction (V) | Neo4j failure causes MySQL transaction rollback | To be verified |
-| T25 | Warehouse delete cascade (S) | Deleting a warehouse also removes its dependent batches | To be verified |
+| T25 | Warehouse delete cascade (S) | Deleting a warehouse also removes its dependent batches | SQL migration present; execution evidence pending |
 | T26 | Index verification (S) | EXPLAIN shows `idx_sale_mandi_crop_date` for the specified query | To be verified |
 
 ## 13.2 Constraint Testing
