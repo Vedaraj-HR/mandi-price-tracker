@@ -666,3 +666,103 @@ A vector database is mainly designed to store embeddings and perform similarity 
 ### Consistency Between MySQL and Neo4j
 
 MySQL remains the source of truth, while Neo4j maintains a graph representation of the mandi road network. When a route is modified, the application performs the MySQL and Neo4j operations together using transaction handling. If the Neo4j operation fails, the MySQL transaction is rolled back to avoid leaving the two databases inconsistent.
+
+## 14. U9 Documentation Contributions (V)
+
+### 14.1 Maps and Real Data
+
+Daily mandi prices can be imported from the Agmarknet resource published through India's data.gov.in portal under the Open Government License. The importer requests the configured state and crops, keeps the configured markets, normalises dates and numeric fields, and skips records with missing dates, non-positive prices, or a minimum/modal/maximum order that is invalid. Multiple varieties and grades for one market, crop and date are combined into one daily record. The result is written to `price_record` with `source = 'agmarknet'`; sample and manually entered records retain their own source labels.
+
+The configured map service is OpenRouteService. It geocodes farmer-entered places and supplies driving distances for farmer-to-mandi distances and the road builder when the API key and service are available. When they are unavailable, the application uses a Haversine straight-line distance multiplied by 1.25 and marks the result as an estimate. Latitude and longitude values are nullable and range-checked in MySQL. A map estimate is therefore distinguishable from a road distance returned by the service.
+
+### 14.2 NoSQL Model
+
+MySQL remains the source of truth. Neo4j holds a graph copy with `Mandi` and `Farmer` nodes. Directed `ROUTE` relationships carry `distance`, `cost` and `open`; `NEAR` relationships carry a farmer's `distance` to a mandi and an `open` flag. The graph synchronisation script creates or updates mandi nodes and road relationships from MySQL and synchronises farmer nodes and their nearby-mandi links.
+
+The application uses Cypher `MERGE` and `SET` to create or update nodes and relationships, `MATCH` to read route and distance paths, and `DELETE` or `DETACH DELETE` to remove a road or farmer. Road changes update MySQL and Neo4j together; an error in the graph write rolls back the MySQL transaction. Before a farmer search, the application refreshes that farmer's graph node and `NEAR` links from the MySQL profile, so a later search repairs a missing or stale farmer node. MySQL remains the rebuildable source for the graph data.
+
+The graph synchronisation uses `CREATE` to rebuild `Mandi` nodes and directed `ROUTE` relationships from MySQL. Farmer registration and refresh use `MERGE` to create or match the farmer node and its `NEAR` links. These are the graph creation queries:
+
+```cypher
+// Create the MySQL-derived mandi and route graph.
+UNWIND $mandis AS m
+CREATE (:Mandi {id: toInteger(m.id), name: m.name, location: m.location})
+```
+
+```cypher
+// Create directed routes from the MySQL road rows.
+UNWIND $roads AS road
+MATCH (a:Mandi {id: toInteger(road.source)}), (b:Mandi {id: toInteger(road.destination)})
+CREATE (a)-[:ROUTE {distance: toFloat(road.distance), cost: toFloat(road.cost), open: road.open}]->(b)
+```
+
+The route read, update and delete queries are:
+
+```cypher
+// Read a cheapest open road path (up to six roads).
+MATCH p = (a:Mandi {id: toInteger($src)})-[:ROUTE*1..6]->(b:Mandi {id: toInteger($dst)})
+WHERE all(r IN relationships(p) WHERE r.open = true)
+WITH p, reduce(c = 0.0, r IN relationships(p) | c + r.cost) AS totalCost
+RETURN [n IN nodes(p) | n.name] AS route, totalCost
+ORDER BY totalCost ASC
+LIMIT 1
+```
+
+```cypher
+// Update an existing directed road.
+MATCH (:Mandi {id: toInteger($src)})-[r:ROUTE]->(:Mandi {id: toInteger($dst)})
+SET r.distance = toFloat($distance), r.cost = toFloat($cost), r.open = $open
+```
+
+```cypher
+// Delete an existing directed road.
+MATCH (:Mandi {id: toInteger($src)})-[r:ROUTE]->(:Mandi {id: toInteger($dst)})
+DELETE r
+```
+
+Farmer graph updates use `MERGE (f:Farmer {id: ...})` and `MERGE (f)-[r:NEAR]->(m)` with `SET` for profile and distance values; deletion uses `MATCH (f:Farmer {id: ...}) DETACH DELETE f`.
+
+The farmer create/update form deletes its previous nearby links before rebuilding them:
+
+```cypher
+MERGE (f:Farmer {id: toInteger($id)})
+SET f.name = $name, f.lat = toFloat($lat), f.lng = toFloat($lng)
+WITH f
+OPTIONAL MATCH (f)-[old:NEAR]->()
+DELETE old
+WITH DISTINCT f
+UNWIND $near AS n
+MATCH (m:Mandi {id: toInteger(n.mandiId)})
+MERGE (f)-[r:NEAR]->(m)
+SET r.distance = toFloat(n.distance), r.open = true
+```
+
+The farmer distance read and delete queries are:
+
+```cypher
+MATCH p = (f:Farmer {id: toInteger($id)})-[:NEAR|ROUTE*1..6]->(m:Mandi)
+WHERE all(r IN relationships(p) WHERE r.open = true)
+WITH m, reduce(d = 0.0, r IN relationships(p) | d + r.distance) AS distance
+RETURN m.id AS mandiId, min(distance) AS distance
+```
+
+```cypher
+MATCH (f:Farmer {id: toInteger($id)})
+DETACH DELETE f
+```
+
+### 14.3 Best Mandi Algorithm
+
+For a farmer search, the application refreshes the farmer node and nearby-mandi links, then asks Neo4j for the shortest open path from that farmer to each reachable mandi. The path query accepts up to six `NEAR`/`ROUTE` relationships, excludes paths containing a closed relationship, sums their distances and keeps the shortest distance to each mandi. MySQL supplies the latest available price for the selected crop at each mandi; the search does not make a live price-feed request.
+
+Without a transport rate, reachable mandis are ranked by the latest modal price and the distance is shown separately. If the farmer supplies a rate per kilometre, net return is calculated as `quantity × modal price − distance × rate`; selecting a return trip doubles the transport distance cost. The response is then ranked by net return. The break-even rate compares each option with the nearest mandi and shows the rate at which its additional price income offsets its additional transport distance (or reports when it can never or always be better under that comparison).
+
+### 14.4 Limitations (V Contribution)
+
+The Agmarknet feed provides the imported market-price records; farmers, sales, warehouses, stored batches and crop shelf lives in the demonstration data are simulated. A farmer enters the transport rate used in the recommendation, so the estimate is not a quoted freight price. The search assumes a one-way trip unless the farmer selects the return-trip option. Map distances fall back to an estimate when the map service cannot be used. Farmer price reads are not row-scoped because the price data is shared across farmers. Scoped stored procedures rely on the application passing the user ID from its signed session cookie, so that application identity boundary is part of the trust model.
+
+### 14.5 ER Diagram and Relational Schema Contribution
+
+The diagrams reflect the current SQL schema, including the optional user links to a mandi or warehouse; the unique, optional farmer login link; the farmer-to-mandi proximity relationship and its `distance`; and the optional farmer owner on a storage batch. They also show mandi and farmer coordinates, farmer place, crop shelf life, road open status, and the price-record source. The relational schema includes `farmer_near_mandi` with the composite key `(farmer_id, mandi_id)` and both foreign keys.
+
+The schema's new checks cover latitude and longitude ranges, positive shelf life when set, road status values `0` or `1`, positive proximity distance, allowed price sources (`agmarknet`, `sample`, `manual`), and the five application roles. Every added attribute depends on its table's key. In particular, `farmer_near_mandi.distance` depends on the full composite key `(farmer_id, mandi_id)`, preserving third normal form. The final diagrams are [Mandi Price Tracking System - ER Diagram](diagrams/mandi_er_diagram.pdf) and [Mandi Price Tracking System - Relational Schema](diagrams/mandi_relational_schema.pdf).
